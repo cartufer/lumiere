@@ -21,7 +21,7 @@ class lumiere_bot
     # wss_server = "irc-ws.chat.twitch.tv"
     # wss = None
     sockaddr = None
-    def __init__(self, n = None, p = None, c = None, onmessage, onclose, wss_ssl = True):
+    def __init__(self, n = None, p = None, c = None, onmessage = None, onclose = None, wss_ssl = True):
         # self.nick = None
         # self.password = None
         # self.channel = None
@@ -45,8 +45,11 @@ class lumiere_bot
         else:
             pass
 
+    def callbacks(self, onmessage, onclose):
+        self.onmessage = onmessage
+        self.onclose = onclose
 
-    def setup(self, n = None, p = None, c = None, onmessage, onclose, wss_ssl = True):
+    def setup(self, n = None, p = None, c = None, onmessage = None, onclose = None, wss_ssl = True):
         if n and p and c:
             self.nick = n
             self.password = p
@@ -62,34 +65,49 @@ class lumiere_bot
                 self.onmessage = backcall
                 self.onclose = onclose
             except OSError:
-                print('error getting settings')
+                print('error getting settings, %s'.format(self))
                 write_settings()
 
 
     def connect(self, n, p, c):
         if !setup:
+            print('not setup, %s'.format(self))
             return false
         if wss:
-            sockaddr = usocket.getaddrinfo(serveraddr, 443)[0][-1]
+            self.sockaddr = usocket.getaddrinfo(serveraddr, 443)[0][-1]
         else:
-            sockaddr = usocket.getaddrinfo(serveraddr, 80)[0][-1]
+            self.sockaddr = usocket.getaddrinfo(serveraddr, 80)[0][-1]
         # sockaddr = usocket.getaddrinfo(server, 80)[0][-1]
-        self.s = usocket.socket(af=AF_INET, type=SOCK_STREAM, proto=IPPROTO_TCP)
-        sock.connect(sockaddr)
+        self.sock = usocket.socket(af=AF_INET, type=SOCK_STREAM, proto=IPPROTO_TCP)
+        self.sock.connect(sockaddr)
         if wss:
-            ussl.wrap_socket(sock, server_side=False, keyfile=None, certfile=None, cert_reqs=CERT_NONE, ca_certs=None)
+            self.wss_sock = ussl.wrap_socket(sock, server_side=False, keyfile=None, certfile=None, cert_reqs=CERT_NONE, ca_certs=None)
         # return False
         run_loop()
 
     def run_loop():
-        if wss:
-
+        try:
+            if wss:
+                reading = self.wss_sock.read(self.max_buff)
             else:
-                reading = socket.recv(max_buff)
+                reading = self.sock.recv(self.max_buff)
+            # reading = socket.recv(max_buff)
+            print(reading)
+        	if ("PING" == reading[0:4]):
+                if wss:
+                    wss_sock.write(reading.replace("PING", "PONG"))
+                else:
+                    s.send(reading.replace("PING", "PONG"))
+        		# s.send(line.replace("PING", "PONG"))
+        		break
 
-    	if ("PING" == reading[0:4]):
-    		s.send(line.replace("PING", "PONG"))
-    		break
+            self.onmessage(reading)
+        except (IOError, OSError) as err:
+
+                print("error found in run_loop, %s, %s".format(self, err))
+            onclose(err)
+
+
 
     def read_settings():
         try:
