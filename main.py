@@ -1,4 +1,5 @@
 import wifimgr
+from bot import *
 
 wlan = wifimgr.get_connection()
 if wlan is None:
@@ -9,3 +10,5 @@ if wlan is None:
 
 # Main Code goes here, wlan is a working network.WLAN(STA_IF) instance.
 print("ESP OK")
+
+lumi = lumiere_bot
