@@ -10,5 +10,11 @@ if wlan is None:
 
 # Main Code goes here, wlan is a working network.WLAN(STA_IF) instance.
 print("ESP OK")
+def message_handler():
+    pass
+
+def close_handler():
+    pass
 
 lumi = lumiere_bot()
+lumi.callbacks(message_handler, close_handler)

@@ -24,7 +24,7 @@ class lumiere_bot
     def __init__(self, n = None, p = None, c = None, onmessage = None, onclose = None, wss_ssl = True):
         # self.nick = None
         # self.password = None
-        # self.channel = None
+        # self.chan = None
         # self.wss = wss_ssl
         # self.setup = False
         print("attempting setup, %s".format(self))
@@ -38,31 +38,34 @@ class lumiere_bot
         # sock_connect()
         # run_loop()
 
+    def dummy():
+        pass
 
     def post(self, message):
         if wss:
-            pass
+            self.wss_sock.write("PRIVMSG #" + self.chan + " :" + message + "\r\n")
         else:
-            pass
+            self.sock.send("PRIVMSG #" + self.chan + " :" + message + "\r\n")
 
     def callbacks(self, onmessage, onclose):
         self.onmessage = onmessage
         self.onclose = onclose
+        print('callbacks setup, %s'.format(self))
 
-    def setup(self, n = None, p = None, c = None, onmessage = None, onclose = None, wss_ssl = True):
+    def setup(self, n = None, p = None, c = None, onmessage = self.dummy, onclose = self.dummy, wss_ssl = True):
         if n and p and c:
             self.nick = n
             self.password = p
             self.chan = c
             self.wss = wss_ssl
             self.setup = True
-            self.onmessage = backcall
+            self.onmessage = onmessage
             self.onclose = onclose
         else:
             try:
-                setup = read_settings()
-                wss = wss_ssl
-                self.onmessage = backcall
+                self.setup = read_settings()
+                self.wss = wss_ssl
+                self.onmessage = onmessage
                 self.onclose = onclose
             except OSError:
                 print('error getting settings, %s'.format(self))
@@ -72,7 +75,7 @@ class lumiere_bot
     def connect(self, n, p, c):
         if !setup:
             print('not setup, %s'.format(self))
-            return false
+            return False
         if wss:
             self.sockaddr = usocket.getaddrinfo(serveraddr, 443)[0][-1]
         else:
@@ -80,32 +83,33 @@ class lumiere_bot
         # sockaddr = usocket.getaddrinfo(server, 80)[0][-1]
         self.sock = usocket.socket(af=AF_INET, type=SOCK_STREAM, proto=IPPROTO_TCP)
         self.sock.connect(sockaddr)
-        if wss:
+        if self.wss:
             self.wss_sock = ussl.wrap_socket(sock, server_side=False, keyfile=None, certfile=None, cert_reqs=CERT_NONE, ca_certs=None)
         # return False
         run_loop()
 
     def run_loop():
-        try:
-            if wss:
-                reading = self.wss_sock.read(self.max_buff)
-            else:
-                reading = self.sock.recv(self.max_buff)
-            # reading = socket.recv(max_buff)
-            print(reading)
-        	if ("PING" == reading[0:4]):
-                if wss:
-                    wss_sock.write(reading.replace("PING", "PONG"))
+        while True:
+            try:
+                if self.wss:
+                    reading = self.wss_sock.read(self.max_buff)
                 else:
-                    s.send(reading.replace("PING", "PONG"))
-        		# s.send(line.replace("PING", "PONG"))
-        		break
-
-            self.onmessage(reading)
-        except (IOError, OSError) as err:
-
+                    reading = self.sock.recv(self.max_buff)
+                # reading = socket.recv(max_buff)
+                print(reading)
+            	if ("PING" == reading[0:4]):
+                    if self.wss:
+                        self.wss_sock.write(reading.replace("PING", "PONG"))
+                    else:
+                        self.sock.send(reading.replace("PING", "PONG"))
+                else:
+                    self.onmessage(reading)
+            except (IOError, OSError) as err:
                 print("error found in run_loop, %s, %s".format(self, err))
-            onclose(err)
+                onclose(err)
+                return err
+
+
 
 
 
@@ -113,10 +117,12 @@ class lumiere_bot
         try:
             with open(NETWORK_SETTINGS) as f:
                 line = f.readlines()
-                nick, password, chan = line.strip("\n").split(";")
+                self.nick, self.password, self.chan = line.strip("\n").split(";")
+                self.setup = True
                 return True
         except IOError:
             write_settings()
+        return False
         # else:
             # with f:
                 # print f.readlines()
@@ -124,10 +130,10 @@ class lumiere_bot
             # line = f.readlines()
             # nick, password, chan = line.strip("\n").split(";")
             # return True
-        return False
 
 
     def write_settings():
+        self.setup = False
         print('there is not yet a way to configure user settings, follow instructions on github page') // todo, cartufer
             # do something to make settings, or reset
             # os.remove("ChangedFile.csv")
