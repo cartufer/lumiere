@@ -1,4 +1,4 @@
-import network, usocket, ussl, datetime, time, os, json
+import network, usocket, ussl, datetime, utime, os, json
 
 
 # NETWORK_SETTINGS = 'settings.dat'
@@ -21,6 +21,7 @@ class lumiere_bot
     # wss_server = "irc-ws.chat.twitch.tv"
     # wss = None
     sockaddr = None
+    wait = 1000
     def __init__(self, n = None, p = None, c = None, onmessage = None, onclose = None, wss_ssl = True):
         # self.nick = None
         # self.password = None
@@ -40,9 +41,15 @@ class lumiere_bot
 
     def dummy():
         pass
+    def wait():
+        n = utime.ticks_diff(ticks1, ticks2)
+        if n >= 0 and n < 1000:
+            utime.sleep_ms(ms)
+        self.lastmessage = utime.ticks_ms()
 
     def post(self, message):
-        if wss:
+        self.wait()
+        if self.wss:
             self.wss_sock.write("PRIVMSG #" + self.chan + " :" + message + "\r\n")
         else:
             self.sock.send("PRIVMSG #" + self.chan + " :" + message + "\r\n")
@@ -73,10 +80,11 @@ class lumiere_bot
 
 
     def connect(self, n, p, c):
+        self.lastmessage = utime.ticks_ms()
         if !setup:
             print('not setup, %s'.format(self))
             return False
-        if wss:
+        if self.wss:
             self.sockaddr = usocket.getaddrinfo(serveraddr, 443)[0][-1]
         else:
             self.sockaddr = usocket.getaddrinfo(serveraddr, 80)[0][-1]
@@ -84,7 +92,7 @@ class lumiere_bot
         self.sock = usocket.socket(af=AF_INET, type=SOCK_STREAM, proto=IPPROTO_TCP)
         self.sock.connect(sockaddr)
         if self.wss:
-            self.wss_sock = ussl.wrap_socket(sock, server_side=False, keyfile=None, certfile=None, cert_reqs=CERT_NONE, ca_certs=None)
+            self.wss_sock = ussl.wrap_socket(self.sock, server_side=False, keyfile=None, certfile=None, cert_reqs=CERT_NONE, ca_certs=None)
         # return False
         run_loop()
 
@@ -98,6 +106,7 @@ class lumiere_bot
                 # reading = socket.recv(max_buff)
                 print(reading)
             	if ("PING" == reading[0:4]):
+                    self.wait()
                     if self.wss:
                         self.wss_sock.write(reading.replace("PING", "PONG"))
                     else:

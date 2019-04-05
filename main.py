@@ -1,5 +1,5 @@
 import wifimgr
-from bot import *
+from bot import lumiere_bot
 
 wlan = wifimgr.get_connection()
 if wlan is None:
