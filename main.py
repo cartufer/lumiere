@@ -15,10 +15,9 @@ print("ESP OK")
 # below are several related functions that users may find helpful
 
 def message_handler(message): # this will be the whole unmodified privmsg
-    
     pass
 
-def close_handler(thing1, thing2): # i forgot what these were, cartufer
+def close_handler(error): # was it one thing or 2?, cartufer
     pass
 
 def runloopcallback(): # this will be a place to put things to run inside of the bot's run loop

@@ -1,8 +1,82 @@
-import network, usocket, ussl, datetime, utime, os, json
+from __future__ import print_function
+import sys,os,struct,network, ussl, datetime, time, json
+
+try:
+    import usocket as socket
+except ImportError:
+    import socket
+import websocket_helper
+
+DEBUG = True
+# Define to 1 to use builtin "uwebsocket" module of MicroPython
+USE_BUILTIN_UWEBSOCKET = False
+# import network, usocket, ussl, datetime, utime, os, json
+def debugmsg(msg):
+    if DEBUG:
+        print(msg)
+if USE_BUILTIN_UWEBSOCKET:
+    from uwebsocket import websocket
+else:
+    class websocket:
+
+        def __init__(self, s):
+            self.s = s
+            self.buf = b""
+
+        def write(self, data):
+            l = len(data)
+            if l < 126:
+                # TODO: hardcoded "binary" type
+                hdr = struct.pack(">BB", 0x82, l)
+            else:
+                hdr = struct.pack(">BBH", 0x82, 126, l)
+            self.s.send(hdr)
+            self.s.send(data)
+
+        def recvexactly(self, sz):
+            res = b""
+            while sz:
+                data = self.s.recv(sz)
+                if not data:
+                    break
+                res += data
+                sz -= len(data)
+            return res
+
+        def read(self, size, text_ok=False):
+            if not self.buf:
+                while True:
+                    hdr = self.recvexactly(2)
+                    assert len(hdr) == 2
+                    fl, sz = struct.unpack(">BB", hdr)
+                    if sz == 126:
+                        hdr = self.recvexactly(2)
+                        assert len(hdr) == 2
+                        (sz,) = struct.unpack(">H", hdr)
+                    if fl == 0x82:
+                        break
+                    if text_ok and fl == 0x81:
+                        break
+                    debugmsg("Got unexpected websocket record of type %x, skipping it" % fl)
+                    while sz:
+                        skip = self.s.recv(sz)
+                        debugmsg("Skip data: %s" % skip)
+                        sz -= len(skip)
+                data = self.recvexactly(sz)
+                assert len(data) == sz
+                self.buf = data
+
+            d = self.buf[:size]
+            self.buf = self.buf[size:]
+            assert len(d) == size, len(d)
+            return d
+
+        def ioctl(self, req, val):
+            assert req == 9 and val == 2
 
 # try not to put things before the class, they won't be brought into your code when you reference the class
-# 
-# 
+#
+#
 # NETWORK_SETTINGS = 'settings.dat'
 # EMOTE_SETTINGS = 'emotes.txt'
 # max_buff = 1024
@@ -12,8 +86,8 @@ import network, usocket, ussl, datetime, utime, os, json
 # chat_server = "irc-ws.chat.twitch.tv:80" # update to wss, cartufer
 # wss = None
 class lumiere_bot
-    NETWORK_SETTINGS = 'settings.dat'
-    EMOTE_SETTINGS = 'emotes.txt' # write a handler for this file, cartufer
+    NETWORK_SETTINGS = 'settings.json'
+    EMOTE_SETTINGS = 'emotes.json' # write a handler for this file, cartufer
     max_buff = 1024
     # setup = False
     # nick = ""
@@ -23,12 +97,13 @@ class lumiere_bot
     # wss_server = "irc-ws.chat.twitch.tv"
     # wss = None
     sockaddr = None
-    wait_time = 1000 # minimum time between messages in milliseconds, any less than a thousand and it's likely to just kick you
+    wait_time = 1600 # minimum time between messages in milliseconds, any less than a thousand and it's likely to just kick you
+    #the tightest time limit is 20 messages in 30 seconds, i set it 0.1 seconds over that
     def __init__(self, n = None, p = None, c = None, onmessage = None, onclose = None, wss_ssl = True):
         # you can pass in the credentials through init and it'll just pass it to setup
         # setup won't attempt to read from the .dat if setup is already done
         # it won't attempt to connect until you tell it so, and then it'll run_loop
-        # 
+        #
         # self.nick = None
         # self.password = None
         # self.chan = None
@@ -56,10 +131,12 @@ class lumiere_bot
 
     def post(self, message): # this does not yet support PRIVMSG to indivdual users and probably won't, poke me and i'll make it
         self.wait()
+        m = "PRIVMSG #" + self.chan + " :" + message + "\r\n"
+        print("< %s".format(reading))
         if self.wss:
-            self.wss_sock.write("PRIVMSG #" + self.chan + " :" + message + "\r\n")
+            self.wss_sock.write(m)
         else:
-            self.sock.send("PRIVMSG #" + self.chan + " :" + message + "\r\n")
+            self.sock.send(m)
 
     def callbacks(self, onmessage, onclose): # you can use this function to configure callbacks if you setup credentials in a .dat
         self.onmessage = onmessage
@@ -111,6 +188,10 @@ class lumiere_bot
             self.wss_sock = ussl.wrap_socket(self.sock, server_side=False, keyfile=None, certfile=None, cert_reqs=CERT_NONE, ca_certs=None)
         # return False
         # do some conection stuff here, cartufer
+        # self.post("CAP REQ :twitch.tv/membership")
+        # self.post("CAP REQ :twitch.tv/tags")
+        # self.post("CAP REQ :twitch.tv/commands")
+        # self.post("CAP REQ :twitch.tv/tags twitch.tv/commands")
         run_loop()
 
     def run_loop(): # this function is where the magic happens, it is where most of the program happens
@@ -122,13 +203,15 @@ class lumiere_bot
                 else:
                     reading = self.sock.recv(self.max_buff)
                 # reading = socket.recv(max_buff)
-                print(reading)
+                print("> %s".format(reading))
             	if ("PING" == reading[0:4]):
                     self.wait()
+                    reading.replace("PING", "PONG")
+                    print("< %s".format(reading))
                     if self.wss:
-                        self.wss_sock.write(reading.replace("PING", "PONG"))
+                        self.wss_sock.write(reading)
                     else:
-                        self.sock.send(reading.replace("PING", "PONG"))
+                        self.sock.send(reading)
                 else:
                     self.onmessage(reading)
             except (IOError, OSError) as err:
