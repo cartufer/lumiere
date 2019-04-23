@@ -93,7 +93,10 @@ class lumiere_bot
     # nick = ""
     # password = ""
     # chan = ""
-    serveraddr = "irc-ws.chat.twitch.tv" # update to wss, cartufer
+    if DEBUG:
+        serveraddr = "echo.websocket.org" # update to wss, cartufer
+    else:
+        serveraddr = "irc-ws.chat.twitch.tv" # update to wss, cartufer
     # wss_server = "irc-ws.chat.twitch.tv"
     # wss = None
     sockaddr = None
