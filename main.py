@@ -1,23 +1,17 @@
-try:
-    import wifimgr
-except:
-    no_wifimgr = True
-    
+import wifimgr, network
 from bot import lumiere_bot
 
-if !no_wifimgr :
-    
-    wlan = wifimgr.get_connection()
-    if wlan is None:
-        print("Could not initialize the network connection.")
-        while True:
-            pass  # you shall not pass :D
+wlan = wifimgr.get_connection()
+if wlan is None:
+    print("Could not initialize the network connection.")
+    while True:
+        pass  # you shall not pass :D
 
 
 # Main Code goes here, wlan is a working network.WLAN(STA_IF) instance.
 print("ESP OK")
-# the above was an optional wifi setup
-
+ap_if = network.WLAN(network.AP_IF)
+ap_if.active(False) # this forces shutdown of setup interface, i think, cartufer
 # this file is going to be a sample implementation of bot.py
 # below are several related functions that users may find helpful
 
