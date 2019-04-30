@@ -1,5 +1,7 @@
 import wifimgr, network
 from bot import lumiere_bot
+global debug
+debug = True
 
 wlan = wifimgr.get_connection()
 if wlan is None:
@@ -25,8 +27,12 @@ def runloopcallback(): # this will be a place to put things to run inside of the
     pass
 
 lumi = lumiere_bot()
-lumi.callbacks(message_handler, close_handler)
+lumi.callbacks(message_handler, close_handler, runloopcallback)
 
 def is_sub_emote(word): # this function will eventually be able to evaluate if something is camelcase
     if word[0] == word[0].lower() and word != word.lower(): # maybe this could be a bool lambda?
         return True
+    else:
+        return False
+lumi.issetup = True
+lumi.connect()

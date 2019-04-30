@@ -1,5 +1,5 @@
 # from __future__ import print_function
-import sys,os,struct,network, ssl, socket,time,json #,datetime
+import sys,os,struct,network, uwss,usocket,time,json #,datetime
 
 # try:
 #     import usocket as socket
@@ -17,74 +17,74 @@ import sys,os,struct,network, ssl, socket,time,json #,datetime
 #     import ujson as json
 # except ImportError:
 #     import json
-import websocket_helper
-
-DEBUG = True
+# import websocket_helper
+global debug
+debug = True
 # Define to 1 to use builtin "uwebsocket" module of MicroPython
-USE_BUILTIN_UWEBSOCKET = False
+# USE_BUILTIN_UWEBSOCKET = False
 # import network, usocket, ussl, datetime, utime, os, json
-def debugmsg(msg):
-    if DEBUG:
-        print(msg)
-if USE_BUILTIN_UWEBSOCKET:
-    from uwebsocket import websocket
-else:
-    class websocket:
-
-        def __init__(self, s):
-            self.s = s
-            self.buf = b""
-
-        def write(self, data):
-            l = len(data)
-            if l < 126:
-                # TODO: hardcoded "binary" type
-                hdr = struct.pack(">BB", 0x82, l)
-            else:
-                hdr = struct.pack(">BBH", 0x82, 126, l)
-            self.s.send(hdr)
-            self.s.send(data)
-
-        def recvexactly(self, sz):
-            res = b""
-            while sz:
-                data = self.s.recv(sz)
-                if not data:
-                    break
-                res += data
-                sz -= len(data)
-            return res
-
-        def read(self, size, text_ok=False):
-            if not self.buf:
-                while True:
-                    hdr = self.recvexactly(2)
-                    assert len(hdr) == 2
-                    fl, sz = struct.unpack(">BB", hdr)
-                    if sz == 126:
-                        hdr = self.recvexactly(2)
-                        assert len(hdr) == 2
-                        (sz,) = struct.unpack(">H", hdr)
-                    if fl == 0x82:
-                        break
-                    if text_ok and fl == 0x81:
-                        break
-                    debugmsg("Got unexpected websocket record of type %x, skipping it" % fl)
-                    while sz:
-                        skip = self.s.recv(sz)
-                        debugmsg("Skip data: {}" % skip)
-                        sz -= len(skip)
-                data = self.recvexactly(sz)
-                assert len(data) == sz
-                self.buf = data
-
-            d = self.buf[:size]
-            self.buf = self.buf[size:]
-            assert len(d) == size, len(d)
-            return d
-
-        def ioctl(self, req, val):
-            assert req == 9 and val == 2
+# def debugmsg(msg):
+#     if debug:
+#         print(msg)
+# if USE_BUILTIN_UWEBSOCKET:
+#     from uwebsocket import websocket
+# else:
+# class websocket:
+#
+#     def __init__(self, s):
+#         self.s = s
+#         self.buf = b""
+#
+#     def write(self, data):
+#         l = len(data)
+#         if l < 126:
+#             # TODO: hardcoded "binary" type
+#             hdr = struct.pack(">BB", 0x82, l)
+#         else:
+#             hdr = struct.pack(">BBH", 0x82, 126, l)
+#         self.s.send(hdr)
+#         self.s.send(data)
+#
+#     def recvexactly(self, sz):
+#         res = b""
+#         while sz:
+#             data = self.s.recv(sz)
+#             if not data:
+#                 break
+#             res += data
+#             sz -= len(data)
+#         return res
+#
+#     def read(self, size, text_ok=False):
+#         if not self.buf:
+#             while True:
+#                 hdr = self.recvexactly(2)
+#                 assert len(hdr) == 2
+#                 fl, sz = struct.unpack(">BB", hdr)
+#                 if sz == 126:
+#                     hdr = self.recvexactly(2)
+#                     assert len(hdr) == 2
+#                     (sz,) = struct.unpack(">H", hdr)
+#                 if fl == 0x82:
+#                     break
+#                 if text_ok and fl == 0x81:
+#                     break
+#                 debugmsg("Got unexpected websocket record of type %x, skipping it" % fl)
+#                 while sz:
+#                     skip = self.s.recv(sz)
+#                     debugmsg("Skip data: {}" % skip)
+#                     sz -= len(skip)
+#             data = self.recvexactly(sz)
+#             assert len(data) == sz
+#             self.buf = data
+#
+#         d = self.buf[:size]
+#         self.buf = self.buf[size:]
+#         assert len(d) == size, len(d)
+#         return d
+#
+#     def ioctl(self, req, val):
+#         assert req == 9 and val == 2
 
 # try not to put things before the class, they won't be brought into your code when you reference the class
 #
@@ -105,11 +105,12 @@ class lumiere_bot:
     # nick = ""
     # password = ""
     # chan = ""
-    if DEBUG:
+    global debug
+    if debug:
         serveraddr = "echo.websocket.org" # update to wss, cartufer
         wss = True
     else:
-        serveraddr = "irc-ws.chat.twitch.tv" # update to wss, cartufer
+        serveraddr = "not yet" # update to wss, cartufer
         wss = True
     # wss_server = "irc-ws.chat.twitch.tv"
     # wss = None
@@ -138,7 +139,7 @@ class lumiere_bot:
         # sock_connect()
         # run_loop()
 
-    def dummy(self, dontcare):
+    def dummy(self, dontcare = None):
         pass # this is the dummy function for the callbacks, so it has a default value
 
     def wait(self):
@@ -150,15 +151,25 @@ class lumiere_bot:
     def post(self, message): # this does not yet support PRIVMSG to indivdual users and probably won't, poke me and i'll make it
         self.wait()
         m = "PRIVMSG #" + self.chan + " :" + message + "\r\n"
-        print("< {}".format(reading))
-        if self.wss:
-            self.wss_sock.write(m)
-        else:
-            self.sock.send(m)
+        print("< {}".format(m))
+        # if self.wss:
+        self.wss_sock.write(m)
+        # else:
+            # self.sock.send(m)
 
-    def callbacks(self, onmessage, onclose): # you can use this function to configure callbacks if you setup credentials in a .dat
+    def rawpost(self, message): # this does not yet support PRIVMSG to indivdual users and probably won't, poke me and i'll make it
+        self.wait()
+        # m = "PRIVMSG #" + self.chan + " :" + message + "\r\n"
+        print("< {}".format(message))
+        # if self.wss:
+        self.wss_sock.write(message)
+        # else:
+            # self.sock.send(m)
+
+    def callbacks(self, onmessage, onclose, onrunloop): # you can use this function to configure callbacks if you setup credentials in a .dat
         self.onmessage = onmessage
         self.onclose = onclose
+        self.onrunloop = onrunloop
         print('callbacks setup, {}'.format(self))
 
     def setup(self, n = None, p = None, c = None, onmessage = None, onclose = None, wss_ssl = True):
@@ -194,7 +205,7 @@ class lumiere_bot:
                 write_settings()
 
 
-    def connect(self, n, p, c):
+    def connect(self, n = False, p = False, c = False):
         if n and p and c:
             self.nick = n
             self.password = p
@@ -208,44 +219,61 @@ class lumiere_bot:
         if self.issetup == False:
             print('not setup, aborting connect, {}'.format(self))
             return False
-        if self.wss:
-            self.sockaddr = usocket.getaddrinfo(serveraddr, 443)[0][-1]
-        else:
-            self.sockaddr = usocket.getaddrinfo(serveraddr, 80)[0][-1]
+        # if self.wss:
+        self.sockaddr = usocket.getaddrinfo(self.serveraddr, 443)[0][-1]
+        # else:
+            # self.sockaddr = usocket.getaddrinfo(serveraddr, 80)[0][-1]
         # sockaddr = usocket.getaddrinfo(server, 80)[0][-1]
-        self.sock = usocket.socket(af=AF_INET, type=SOCK_STREAM, proto=IPPROTO_TCP)
-        self.sock.connect(sockaddr)
-        if self.wss:
-            self.wss_sock = ussl.wrap_socket(self.sock, server_side=False, keyfile=None, certfile=None, cert_reqs=CERT_NONE, ca_certs=None)
+        self.sock = usocket.socket(usocket.AF_INET, usocket.SOCK_STREAM) # , proto=usocket.IPPROTO_TCP
+        self.sock.connect(self.sockaddr)
+        # if self.wss:
+        self.wss_sock = uwss.wss(self.sock) # ussl.wrap_socket(self.sock, server_side=False, keyfile=None, certfile=None, cert_reqs=CERT_NONE, ca_certs=None)
         # return False
+        time.sleep(5)
+        print("< {}".format("PASS"))
+        self.wss_sock.write("PASS " + self.password + "\r\n")
+        print("< {}".format("NICK"))
+    	self.wss_sock.write("NICK " + self.nick.lower() + "\r\n")
+        time.sleep(5)
+        self.rawpost("CAP REQ :twitch.tv/tags twitch.tv/commands")
+        s.send("JOIN #" + self.channel + "\r\n")
+
         # do some conection stuff here, cartufer
-        # self.post("CAP REQ :twitch.tv/membership")
-        # self.post("CAP REQ :twitch.tv/tags")
-        # self.post("CAP REQ :twitch.tv/commands")
+
+
+        self.rawpost("CAP REQ :twitch.tv/membership")
+        self.rawpost("CAP REQ :twitch.tv/tags")
+        self.rawpost("CAP REQ :twitch.tv/commands")
         # self.post("CAP REQ :twitch.tv/tags twitch.tv/commands")
-        run_loop()
-        # put in a delay before new reconnect and then a reconnect
+        eroor = run_loop() # this will return an error on failure, misspelled on purpose
+        print(eroor)
+
+
+        # put in an increasing delay before a new reconnect
 
     def run_loop(self): # this function is where the magic happens, it is where most of the program happens
         running = True
         while running:
             try:
-                if self.wss:
-                    reading = self.wss_sock.read(self.max_buff)
-                else:
-                    reading = self.sock.recv(self.max_buff)
-                # reading = socket.recv(max_buff)
+                # if self.wss:
+                reading = self.wss_sock.read(self.max_buff, True)
+                # read_list = splitlines(reading)
+                # for lines in read_list
+                # else:
+                    # reading = self.sock.recv(self.max_buff)
+                # reading = usocket.recv(max_buff)
                 print("> {}".format(reading))
             	if ("PING" == reading[0:4]):
                     self.wait()
                     reading.replace("PING", "PONG")
                     print("< {}".format(reading))
-                    if self.wss:
-                        self.wss_sock.write(reading)
-                    else:
-                        self.sock.send(reading)
+                    # if self.wss:
+                    self.wss_sock.write(reading)
+                    # else:
+                        # self.sock.send(reading)
                 else:
                     self.onmessage(reading)
+                self.onrunloop()
             except OSError as err:
                 print("error found while in run_loop, {}, {}".format(self, err))
                 self.onclose(err)
@@ -255,11 +283,16 @@ class lumiere_bot:
 
 
 
+
     def read_settings(self):
         try:
             with open(self.login_file) as f:
-                line = f.readlines()
-                self.nick, self.password, self.chan = line.strip("\n").split(";")
+                data = json.load(f)
+                self.nick = data['nick']
+                self.password = data['password']
+                self.chan = data['chan']
+                # line = f.readlines()
+                # self.nick, self.password, self.chan = line.strip("\n").split(";")
                 self.issetup = True
                 return True
         except OSError as err:
